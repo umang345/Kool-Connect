@@ -1,0 +1,24 @@
+{
+  "name": "kool-connect",
+  "version": "1.0.0",
+  "description": "Online Meeting Application",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^4.3.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://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:x-oauth-basic@github.com/umang345/Kool-Connect.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/umang345/Kool-Connect/issues"
+  },
+  "homepage": "https://github.com/umang345/Kool-Connect#readme"
+}
