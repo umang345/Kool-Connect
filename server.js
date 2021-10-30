@@ -11,6 +11,7 @@ const io = require("socket.io")(server,{
 app.use(express.static(path.join(__dirname,"")));
 
 var userConnections = [];
+var other_users_global = [];
 
 io.on("connection",(socket)=>{
     console.log("Socket id is ",socket.id);
@@ -31,6 +32,8 @@ io.on("connection",(socket)=>{
                 connId : socket.id 
             })
         })
+
+        other_users_global = other_users;
 
         socket.emit("inform_me_about_other_users",other_users);
     });

@@ -1,3 +1,4 @@
+var globalSocket;
 var AppProcess = (function(){
 
     var peers_connection_ids = [];
@@ -6,6 +7,7 @@ var AppProcess = (function(){
     var remote_aud_stream = [];
     var local_div;
     var serverProcess;
+    var my_connection_id;
     var audio;
     var isAudioMute = true;
     var rtp_aud_senders = [];
@@ -42,12 +44,12 @@ var AppProcess = (function(){
              if(isAudioMute)
              {
                   audio.enabled = true;
-                  $(this).html("<span class='material-icons'>mic</span>");
+                  $(this).html("<span class='material-icons' style='width: 100%;' >mic</span>");
                   updateMediaSenders(audio,rtp_aud_senders);
              }
              else{
                   audio.enabled = false;
-                  $(this).html("<span class='material-icons'>mic_off</span>");
+                  $(this).html("<span class='material-icons' style='width: 100%;' >mic_off</span>");
                   removeMediaSenders(rtp_aud_senders);
              }
 
@@ -77,8 +79,63 @@ var AppProcess = (function(){
          })
     }
 
+    async function loadAudio(){
+        try{
+            var astream = await navigator.mediaDevices.getUserMedia({
+                video:false,
+                audio:true
+            });
+            audio = astream.getAudioTracks()[0];
+            audio.enabled = false;
+        }
+        catch(e)
+        {
+             console.log(e);
+             return;
+        }
+    }
+
+    function removeMediaSenders(rtp_senders)
+    {
+         for(var con_id in peers_connection_ids)
+         {
+              if(rtp_senders[con_id] && connection_status(peers_connection[con_id]))
+              {
+                   peers_connection[con_id].removeTrack(rtp_senders[con_id]);
+                   rtp_senders[con_id] = null;
+              }
+         }
+
+         globalSocket.emit("reset_video_for_particular_connection",my_connection_id);
+
+         
+    }
+
+    function removeVideoStream(rtp_vid_senders)
+    {
+         if(videoCamTrack)
+         {
+              videoCamTrack.stop();
+              videoCamTrack = null;
+              local_div.srcObject = null;
+              removeMediaSenders(rtp_vid_senders);
+         }
+    }
+
     async function videoProcess(newVideoState)
     { 
+        if(newVideoState == video_states.None)
+        { 
+            $("#videoCamOnOff").html("<span class='material-icons' style='width: 100%;' >videocam_off</span>");
+            video_st = newVideoState;
+
+            removeVideoStream(rtp_vid_senders);
+            return;
+        }
+        if(newVideoState == video_states.Camera)
+        { 
+            $("#videoCamOnOff").html("<span class='material-icons' style='width: 100%;' >videocam_on</span>")
+        }
         try
         {
              var vstream = null;
@@ -175,6 +232,8 @@ var AppProcess = (function(){
                  serverProcess(JSON.stringify({icecandidate : event.candidate}),connId);
             }
         }
+
+        
 
         connection.ontrack = function(event){
 
@@ -306,7 +365,8 @@ var MyApp = (function(){
     function event_process_for_signaling_server()
     {
          socket = io.connect();
-
+         globalSocket = socket;
+         console.log(globalSocket);
 
          var SDP_function = function(data,to_connId)
          {
