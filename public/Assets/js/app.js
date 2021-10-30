@@ -4,11 +4,121 @@ var AppProcess = (function(){
     var peers_connection = [];
     var remote_vid_stream = [];
     var remote_aud_stream = [];
+    var local_div;
     var serverProcess;
+    var audio;
+    var isAudioMute = true;
+    var rtp_aud_senders = [];
+    var video_states = {
+        None:0,
+        Camera:1,
+        ScreenShare:2 
+    }
+    var video_st = video_states.None;
+    var videoCamTrack;
+    var rtp_vid_senders = [];
     async function _init(SDP_function,my_connId)
     {
          serverProcess = SDP_function;
          my_connection_id = my_connId;
+         eventProcess();
+         local_div = document.getElementById("localVideoPlayer");
+    }
+
+    function eventProcess()
+    {
+         $("#miceMuteUnmute").on("click",async function(){
+             if(!audio)
+             {
+                  await loadAudio();
+             }
+
+             if(!audio)
+             {
+                  alert("Audio permission has not been granted");
+                  return;
+             }
+
+             if(isAudioMute)
+             {
+                  audio.enabled = true;
+                  $(this).html("<span class='material-icons'>mic</span>");
+                  updateMediaSenders(audio,rtp_aud_senders);
+             }
+             else{
+                  audio.enabled = false;
+                  $(this).html("<span class='material-icons'>mic_off</span>");
+                  removeMediaSenders(rtp_aud_senders);
+             }
+
+             isAudioMute = !isAudioMute;
+         });
+
+         $("#videoCamOnOff").on("click",async function(){
+                if(video_st == video_states.Camera)
+                {
+                     await videoProcess(video_states.None);
+                }
+                else
+                {
+                    await videoProcess(video_states.Camera);
+                }
+         })
+       
+         $("#ScreenShareOnOff").on("click",async function(){
+                if(video_st == video_states.ScreenShare)
+                {
+                     await videoProcess(video_states.None);
+                }
+                else
+                {
+                    await videoProcess(video_states.ScreenShare);
+                }
+         })
+    }
+
+    async function videoProcess(newVideoState)
+    { 
+        try
+        {
+             var vstream = null;
+             if(newVideoState == video_states.Camera)
+             {
+                  vstream =  await navigator.mediaDevices.getUserMedia({
+                      video : {
+                          width: 1920,
+                          height: 1080
+                      },
+                      audio:false
+                  })
+             }
+             else if(newVideoState == video_states.ScreenShare){
+                vstream =  await navigator.mediaDevices.getDisplayMedia({
+                    video : {
+                        width: 1920,
+                        height: 1080
+                    },
+                    audio:false
+                })
+             }
+
+             if(vstream && vstream.getVideoTracks().length>0)
+             {
+                  videoCamTrack = vstream.getVideoTracks()[0];
+                  if(videoCamTrack)
+                  {
+                       local_div.srcObject = new MediaStream([videoCamTrack]);
+                       updateMediaSenders(videoCamTrack,rtp_vid_senders);
+                  }
+             }
+        }
+        catch(e)
+        {
+             console.log(e);
+             return;
+        }
+
+        video_st = newVideoState;
     }
 
     var iceConfiguration = {
@@ -20,6 +130,36 @@ var AppProcess = (function(){
                 urls: "stun:stun1.l.google.com:19302",   
             },
         ]
+    }
+
+    function connection_status(connection)
+    {
+         if(connection && (connection.connectionState == "new" 
+                        || connection.connectionState == "connecting"
+                        || connection.connectionState == "connected"))
+                        {
+                            return true;
+                        }
+        else{
+            return false;
+        }
+    }
+
+    async function updateMediaSenders(track,rtp_senders)
+    {
+         for(var con_id in peers_connection_ids)
+         {
+              if(connection_status(peers_connection[con_id]))
+              {
+                   if(rtp_senders[con_id] && rtp_senders[con_id].track)
+                   {
+                        rtp_senders[con_id].replaceTrack(track);
+                   }
+                   else{
+                        rtp_senders[con_id] = peers_connection[con_id].addTrack(track);
+                   }
+              }
+         }
     }
 
     async function setConnection(connId){
@@ -36,7 +176,9 @@ var AppProcess = (function(){
             }
         }
 
-        connection.ontrack - function(event){
+        connection.ontrack = function(event){
+
+            console.log(event);
             if(!remote_vid_stream[connId])
             {
                  remote_vid_stream[connId] = new MediaStream();
@@ -54,6 +196,7 @@ var AppProcess = (function(){
 
                  remote_vid_stream[connId].addTrack(event.track);
                  var remoteVideoPlayer = document.getElementById("v_"+connId);
+                 console.log(remoteVideoPlayer);
                  remoteVideoPlayer.srcObject = null;
                  remoteVideoPlayer.srcObject = remote_vid_stream[connId];
                  remoteVideoPlayer.load();
@@ -75,6 +218,12 @@ var AppProcess = (function(){
         peers_connection_ids[connId] = connId;
         peers_connection[connId] = connection;
 
+        if(video_st == video_states.Camera || video_st == video_states.ScreenShare)
+        {
+            if(videoCamTrack){
+                updateMediaSenders(videoCamTrack,rtp_vid_senders);
+            }
+        }
         return connection;
     }
 
@@ -138,7 +287,7 @@ var AppProcess = (function(){
              await SDPProcess(data,from_connId);
         }
     }
-})
+})();
 var MyApp = (function(){
 
     var user_id="";
@@ -147,6 +296,9 @@ var MyApp = (function(){
     {
          user_id=uid;
          meeting_id = mid;
+         $("#meetingContainer").show();
+         $("#me h2").text(user_id+"(Me)");
+         document.title = user_id;
          event_process_for_signaling_server();
     }
 
@@ -169,7 +321,7 @@ var MyApp = (function(){
                   AppProcess.init(SDP_function,socket.id);
                   if(user_id!="" && meeting_id!="")
                   {
-                       socket.connect("userconnect",{
+                       socket.emit("userconnect",{
                             displayName : user_id,
                             meetingid: meeting_id
                        });
@@ -183,6 +335,7 @@ var MyApp = (function(){
          });
         
          socket.on("inform_me_about_other_users",function(other_users){
+             console.log(other_users);
              if(other_users)
              {
                   for(var i=0;i<other_users.length;i++)
@@ -203,12 +356,13 @@ var MyApp = (function(){
     function addUser(other_user_id,connId)
     {
          var newDivId = $("#otherTemplate").clone();
-         newDivId = newDivId.attr("id".connId).addClass("other");
+         console.log(newDivId);
+         newDivId = newDivId.attr("id",connId).addClass("other");
          newDivId.find("h2").text(other_user_id);
-         newDivId.find("video").text("id","v_"+connId);
-         newDivId.find("audio").text("id","a_"+connId);
+         newDivId.find("video").attr("id","v_"+connId);
+         newDivId.find("audio").attr("id","a_"+connId);
          newDivId.show();
-         $("divUsers").append(newDivId);
+         $("#divUsers").append(newDivId);
     }
 
     return {

@@ -17,7 +17,7 @@ io.on("connection",(socket)=>{
     socket.on("userconnect",(data)=>{
         console.log("userconnect",data.displayName,data.meetingid);
 
-        var otherUsers = userConnections.filter((p)=> p.meeting_id == data.meetingid)
+        var other_users = userConnections.filter((p)=> p.meeting_id == data.meetingid)
 
         userConnections.push({
             connectionId : socket.id,
@@ -25,7 +25,7 @@ io.on("connection",(socket)=>{
             meeting_id : data.meetingid
         });
 
-        otherUsers.forEach((v)=>{
+        other_users.forEach((v)=>{
             socket.to(v.connectionId).emit("inform_others_about_me",{
                 other_user_id : data.displayName,
                 connId : socket.id 
