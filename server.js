@@ -31,6 +31,8 @@ io.on("connection",(socket)=>{
                 connId : socket.id 
             })
         })
+
+        socket.emit("inform_me_about_other_users",other_users);
     });
 
     socket.on("SDPProcess",(data)=>{
