@@ -1,5 +1,14 @@
 var AppProcess = (function(){
 
+    var peers_connection_ids = [];
+    var peers_connection = [];
+    var serverProcess;
+    function _init(SDP_function,my_connId)
+    {
+         serverProcess = SDP_function;
+         my_connection_id = my_connId;
+    }
+
     var iceConfiguration = {
         iceServers : [
             {
@@ -13,11 +22,43 @@ var AppProcess = (function(){
 
     function setConnection(connId){
         var connection = new RTCPeerConnection(iceConfiguration);
+
+        connection.onnegotiationneeded = async function(event){
+            await setOffer(connId);
+        }
+
+        connection.onicecandidate = function(event){
+            if(event.candidate)
+            {
+                 serverProcess(JSON.stringify({icecandidate : event.candidate}),connId);
+            }
+        }
+
+        connection.ontrack - function(event){
+
+        }
+
+        peers_connection_ids[connId] = connId;
+        peers_connection[connId] = connection;
+    }
+
+    function setOffer(connId)
+    {
+         var connection = peers_connection[connId];
+         var offer = await connection.createOffer();
+         await connection.setLocalDescription(offer);
+         serverProcess(JSON.stringify({
+             offer : connection.localDescription
+         }),connId);
     }
 
     return {
         setNewConnection : async function(connId){
             await setConnection(connId);
+        },
+        init: async function(SDP_function,my_connId)
+        {
+             await _init(SDP_function,my_connId );
         }
     }
 })
@@ -36,9 +77,19 @@ var MyApp = (function(){
     function event_process_for_signaling_server()
     {
          socket = io.connect();
+
+
+         var SDP_function = function(data,to_connId)
+         {
+              socket.emit("SDPProcess",{
+                    message: data,
+                    to_connId : to_connId
+              });
+         }
          socket.on("connect",()=>{
              if(socket.connected)
              {
+                  AppProcess.init(SDP_function,socket.id);
                   if(user_id!="" && meeting_id!="")
                   {
                        socket.connect("userconnect",{
