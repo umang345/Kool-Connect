@@ -127,6 +127,7 @@ var AppProcess = (function(){
         if(newVideoState == video_states.None)
         { 
             $("#videoCamOnOff").html("<span class='material-icons' style='width: 100%;' >videocam_off</span>");
+            $("#ScreenShareOnOff").html("<span class='material-icons'>present_to_all</span><div>Present Now</div>");
             video_st = newVideoState;
 
             removeVideoStream(rtp_vid_senders);
@@ -157,6 +158,11 @@ var AppProcess = (function(){
                     },
                     audio:false
                 })
+
+                oninactive = (e)=>{
+                     removeVideoStream(rtp_vid_senders);
+                     $("#ScreenShareOnOff").html('<span class="material-icons">present_to_all</span><div>Present Now</div>');
+                }
              }
 
              if(vstream && vstream.getVideoTracks().length>0)
@@ -176,6 +182,16 @@ var AppProcess = (function(){
         }
 
         video_st = newVideoState;
+        if(newVideoState == video_states.Camera)
+        {
+          $("#videoCamOnOff").html("<span class='material-icons' style='width: 100%;' >videocam</span>");
+          $("#ScreenShareOnOff").html('<span class="material-icons">present_to_all</span><div>Present Now</div>');
+        }
+        else if(newVideoState == video_states.ScreenShare)
+        {
+          $("#ScreenShareOnOff").html('<span class="material-icons text-success">present_to_all</span><div class="text-success">Stop Presenting</div>');
+          $("#videoCamOnOff").html("<span class='material-icons' style='width: 100%;' >videocam_off</span>");
+        }
     }
 
     var iceConfiguration = {
