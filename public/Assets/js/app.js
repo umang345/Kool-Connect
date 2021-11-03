@@ -349,6 +349,37 @@ var AppProcess = (function(){
          }
     }
 
+    async function closeConnection(connId)
+    {
+          peers_connection_ids[connId]=null;
+          if(peers_connection[connId])
+          {
+                peers_connection[connId].close();
+                peers_connection[connId] = null;
+          }
+
+          if(remote_aud_stream[connId])
+          {
+                remote_aud_stream[connId].getTracks().forEach((t)=>{
+                     if(t.stop)
+                     {
+                           t.stop();
+                     }
+                })
+                remote_aud_stream[connId] = null;
+          }
+          if(remote_vid_stream[connId])
+          {
+               remote_vid_stream[connId].getTracks().forEach((t)=>{
+                     if(t.stop)
+                     {
+                           t.stop();
+                     }
+                })
+                remote_vid_stream[connId] = null;
+          }
+    }
+
     return {
         setNewConnection : async function(connId){
             await setConnection(connId);
@@ -360,6 +391,10 @@ var AppProcess = (function(){
         processClientFunc: async function(data,from_connId)
         {
              await SDPProcess(data,from_connId);
+        },
+        closeConnectionCall: async function(connId)
+        {
+             await closeConnection(connId);
         }
     }
 })();
@@ -404,6 +439,11 @@ var MyApp = (function(){
                   }
              }
          })
+
+         socket.on("inform_other_about_disconnected_user",function(data){
+               $("#"+data.connId).remove();
+               AppProcess.closeConnectionCall(data.connId);
+         });
 
          socket.on("inform_others_about_me",function(data){
              addUser(data.other_user_id,data.connId);
