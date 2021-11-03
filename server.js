@@ -38,6 +38,22 @@ io.on("connection",(socket)=>{
         socket.emit("inform_me_about_other_users",other_users);
     });
 
+    socket.on("sendMessage", (msg) => {
+        console.log(msg);
+        var mUser = userConnections.find((p) => p.connectionId == socket.id);
+        if (mUser) {
+          var meetingid = mUser.meeting_id;
+          var from = mUser.user_id;
+          var list = userConnections.filter((p) => p.meeting_id == meetingid);
+          list.forEach((v) => {
+            socket.to(v.connectionId).emit("showChatMessage", {
+              from: from,
+              message: msg,
+            });
+          });
+        }
+      });
+
     socket.on("SDPProcess",(data)=>{
         socket.to(data.to_connId).emit("SDPProcess",{
             message : data.message,
