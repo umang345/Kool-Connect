@@ -8,9 +8,11 @@
     "express-fileupload": "^1.2.1",
     "socket.io": "^4.3.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "nodemon": "^2.0.14"
+  },
   "scripts": {
-    "start": "node server"
+    "start": "nodemon server"
   },
   "repository": {
     "type": "git",
